@@ -168,7 +168,7 @@ aside{position:sticky;top:78px;display:grid;gap:16px}
 /* ---------- fields ---------- */
 label.f{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 label.f i{color:var(--hot);font-style:normal}
-input[type=text],input[type=tel],textarea,select{
+input[type=text],input[type=tel],input[type=email],textarea,select{
   width:100%;padding:9px 11px;background:#0d1319;color:var(--text);
   border:1px solid var(--border2);border-radius:7px;
   font-family:var(--sans);font-size:14.5px;
@@ -342,6 +342,8 @@ footer{
         <p>Round your order to the nearest kilogram, one kilo minimum. Price is $68 a kilogram no matter which flavour you pick, so mix and match however you like.</p>
         <h3>Three flavours this batch</h3>
         <p>Traditional is the one you already know. The mild and hot chilli are new, so this batch is partly a taste test. Tell me what you think and it decides what I make next time.</p>
+        <h3>Never tried it?</h3>
+        <p>Take the three free stokkies instead. No payment, no freight, anywhere in Australia. One taste pack per person, and only if you have not bought from me before.</p>
         <h3>When it gets made</h3>
         <p>I only fire up production once orders reach 50 kg dry weight. Until then your order sits in the queue. It is a spare time thing, not a shop, so there is no next day delivery and no tracking number. It gets made properly or it does not get made.</p>
         <h3>Paying</h3>
@@ -350,7 +352,38 @@ footer{
     </section>
 
     <section class="box">
-      <header><b>Pick your flavours</b><span class="count">3 available</span></header>
+      <header><b>How do you want to order?</b></header>
+      <div class="opts">
+        <label class="opt">
+          <input type="radio" name="mode" value="kilo">
+          <span>
+            <span class="t">Buy by the kilo</span>
+            <span class="d" style="display:block">$68 a kilogram, one kilo minimum, mix any flavours.</span>
+          </span>
+          <span class="cost">$68/kg</span>
+        </label>
+        <label class="opt">
+          <input type="radio" name="mode" value="sample">
+          <span>
+            <span class="t">Three free stokkies to try</span>
+            <span class="d" style="display:block">Three free stokkies of droëwors to try if you only want to taste this time. Only for people who have never bought from me before.</span>
+          </span>
+          <span class="cost free">free</span>
+        </label>
+      </div>
+      <div class="addr" id="firstTimerWrap">
+        <label class="opt" style="padding:14px 0;border:0" for="firstTimer">
+          <input type="checkbox" id="firstTimer">
+          <span>
+            <span class="t">I have never bought droëwors from Rob before</span>
+            <span class="d" style="display:block">Free samples and free freight anywhere in Australia, one taste pack per person.</span>
+          </span>
+        </label>
+      </div>
+    </section>
+
+    <section class="box">
+      <header><b>Pick your flavours</b><span class="count" id="flavCount">3 available</span></header>
       <div id="flavs"></div>
     </section>
 
@@ -373,9 +406,10 @@ footer{
       </div>
     </section>
 
-    <section class="box">
+    <section class="box" id="shipBox">
       <header><b>Getting it to you</b></header>
       <div class="opts" id="ship"></div>
+      <div class="hint show" id="sampleShip" style="display:none;margin:16px">Free freight anywhere in Australia on a taste pack. Just give me the address below.</div>
       <div class="addr" id="addrWrap">
         <p class="tiny" style="margin:0 0 14px">Full address please, so the courier can actually find you.</p>
         <div class="field">
@@ -418,13 +452,17 @@ footer{
           </div>
         </div>
         <div class="field">
+          <label class="f" for="email">Email <i>*</i></label>
+          <input type="email" id="email" autocomplete="email" placeholder="So I can send you a copy of your order">
+        </div>
+        <div class="field">
           <label class="f" for="notes">Anything else</label>
           <input type="text" id="notes" placeholder="Optional. Cut it long, drop at the shed, whatever you need">
         </div>
       </div>
     </section>
 
-    <section class="box">
+    <section class="box" id="payBox">
       <header><b>Prepay now</b></header>
       <div class="pad">
         <p class="small">Transfer the total to the account below, then copy your order across to me. Screenshot these details if you want to pay after you send the order.</p>
@@ -474,7 +512,7 @@ footer{
         <ul>
           <li id="ck1">At least 1 kg selected</li>
           <li id="ck2">Delivery or pickup chosen</li>
-          <li id="ck3">Name and phone filled in</li>
+          <li id="ck3">Name, email and phone filled in</li>
         </ul>
       </div>
     </div>
@@ -512,8 +550,15 @@ const SHIPPING = [
   { id:'freight', t:'Anywhere else in Australia', d:'Flat rate per order, however much you buy.', cost:CONFIG.freight }
 ];
 
-const qty = {}; FLAVOURS.forEach(f => qty[f.id] = 0);
+const SAMPLE_STOKKIES = 3;
+
+const kg = {}; FLAVOURS.forEach(f => kg[f.id] = 0);
+const st = {}; FLAVOURS.forEach(f => st[f.id] = 0);
+let mode = null;
 let ship = null;
+
+const isSample = () => mode === 'sample';
+const store = () => isSample() ? st : kg;
 
 const money = n => '$' + n.toLocaleString('en-AU');
 const el = id => document.getElementById(id);
@@ -553,10 +598,30 @@ el('ship').innerHTML = SHIPPING.map(s => `
 document.addEventListener('click', e => {
   const b = e.target.closest('[data-step]');
   if (!b) return;
+  if (!mode) return;
+  const s = store();
   const id = b.dataset.id;
-  qty[id] = Math.max(0, qty[id] + Number(b.dataset.step));
+  const next = Math.max(0, s[id] + Number(b.dataset.step));
+  if (isSample()) {
+    const others = FLAVOURS.reduce((t, f) => t + (f.id === id ? 0 : s[f.id]), 0);
+    if (others + next > SAMPLE_STOKKIES) return;
+  }
+  s[id] = next;
   render();
 });
+
+document.querySelectorAll('input[name=mode]').forEach(r => {
+  r.addEventListener('change', e => {
+    mode = e.target.value;
+    FLAVOURS.forEach(f => { kg[f.id] = 0; st[f.id] = 0; });
+    ship = null;
+    document.querySelectorAll('input[name=ship]').forEach(x => x.checked = false);
+    el('firstTimer').checked = false;
+    render();
+  });
+});
+
+el('firstTimer').addEventListener('change', render);
 
 el('ship').addEventListener('change', e => {
   ship = e.target.value;
@@ -567,7 +632,7 @@ el('ship').addEventListener('change', e => {
 const FREE_POSTCODES = ['3579','3585'];
 const ADDR_FIELDS = ['a1','a2','a3','a4'];
 
-['name','phone','notes'].concat(ADDR_FIELDS).forEach(id => {
+['name','phone','email','notes'].concat(ADDR_FIELDS).forEach(id => {
   el(id).addEventListener('input', render);
   el(id).addEventListener('change', render);
 });
@@ -589,11 +654,12 @@ function addressComplete() {
 }
 
 el('reset').addEventListener('click', () => {
-  FLAVOURS.forEach(f => qty[f.id] = 0);
+  FLAVOURS.forEach(f => { kg[f.id] = 0; st[f.id] = 0; });
+  mode = null;
   ship = null;
-  document.querySelectorAll('input[name=ship]').forEach(r => r.checked = false);
-  ['name','phone','notes'].concat(ADDR_FIELDS).forEach(id => el(id).value = '');
-  el('addrWrap').classList.remove('show');
+  document.querySelectorAll('input[name=mode],input[name=ship]').forEach(r => r.checked = false);
+  el('firstTimer').checked = false;
+  ['name','phone','email','notes'].concat(ADDR_FIELDS).forEach(id => el(id).value = '');
   render();
 });
 
@@ -623,32 +689,47 @@ document.querySelectorAll('.copy').forEach(btn => {
 
 /* totals */
 function totals() {
-  const kg = FLAVOURS.reduce((s, f) => s + qty[f.id], 0);
-  const goods = kg * CONFIG.pricePerKg;
+  if (isSample()) {
+    const sticks = FLAVOURS.reduce((t, f) => t + st[f.id], 0);
+    return { kg: 0, sticks, goods: 0, freight: 0, total: 0 };
+  }
+  const weight = FLAVOURS.reduce((t, f) => t + kg[f.id], 0);
+  const goods = weight * CONFIG.pricePerKg;
   const freight = ship === 'freight' ? CONFIG.freight : 0;
-  return { kg, goods, freight, total: goods + freight };
+  return { kg: weight, sticks: 0, goods, freight, total: goods + freight };
 }
 
 function valid() {
-  const { kg } = totals();
+  const t = totals();
   return {
-    qty: kg >= 1,
-    ship: !!ship && (ship !== 'freight' || addressComplete()),
-    who: el('name').value.trim().length > 1 && el('phone').value.trim().length >= 6
+    qty: isSample() ? t.sticks === SAMPLE_STOKKIES : t.kg >= 1,
+    ship: isSample()
+      ? (addressComplete() && el('firstTimer').checked)
+      : (!!ship && (ship !== 'freight' || addressComplete())),
+    who: el('name').value.trim().length > 1
+      && el('phone').value.trim().length >= 6
+      && /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(el('email').value.trim())
   };
 }
 
 function orderText() {
   const t = totals();
-  const lines = ['DROËWORS ORDER', ''];
-  FLAVOURS.forEach(f => { if (qty[f.id]) lines.push(`${f.name}: ${qty[f.id]} kg`); });
-  lines.push('', `Total weight: ${t.kg} kg`, `Droëwors: ${money(t.goods)}`);
-  lines.push(`Freight: ${t.freight ? money(t.freight) : 'none'}`);
-  lines.push(`TOTAL TO PAY: ${money(t.total)}`, '');
-  const s = SHIPPING.find(x => x.id === ship);
-  lines.push(`Delivery: ${s ? s.t : ''}`);
-  if (ship === 'freight') lines.push(`Address: ${addressText()}`);
-  lines.push('', `Name: ${el('name').value.trim()}`, `Phone: ${el('phone').value.trim()}`);
+  const lines = [isSample() ? 'DROËWORS TASTE PACK' : 'DROËWORS ORDER', ''];
+  const unit = isSample() ? 'stokkies' : 'kg';
+  FLAVOURS.forEach(f => { if (store()[f.id]) lines.push(`${f.name}: ${store()[f.id]} ${unit}`); });
+  if (isSample()) {
+    lines.push('', `Total: ${t.sticks} free stokkies`, 'TOTAL TO PAY: nothing', '');
+    lines.push('Delivery: free freight anywhere in Australia');
+    lines.push(`Address: ${addressText()}`);
+  } else {
+    lines.push('', `Total weight: ${t.kg} kg`, `Droëwors: ${money(t.goods)}`);
+    lines.push(`Freight: ${t.freight ? money(t.freight) : 'none'}`);
+    lines.push(`TOTAL TO PAY: ${money(t.total)}`, '');
+    const s = SHIPPING.find(x => x.id === ship);
+    lines.push(`Delivery: ${s ? s.t : ''}`);
+    if (ship === 'freight') lines.push(`Address: ${addressText()}`);
+  }
+  lines.push('', `Name: ${el('name').value.trim()}`, `Phone: ${el('phone').value.trim()}`, `Email: ${el('email').value.trim()}`);
   if (el('notes').value.trim()) lines.push(`Notes: ${el('notes').value.trim()}`);
   return lines.join('\n');
 }
@@ -656,49 +737,100 @@ function orderText() {
 function render() {
   const t = totals();
   const v = valid();
+  const sample = isSample();
+  const s = store();
 
+  /* mode dependent chrome */
+  el('firstTimerWrap').classList.toggle('show', sample);
+  el('shipBox').style.display = mode ? '' : 'none';
+  el('payBox').style.display = sample ? 'none' : '';
+  el('ship').style.display = sample ? 'none' : '';
+  el('sampleShip').style.display = sample ? 'block' : 'none';
+  el('addrWrap').classList.toggle('show', sample || ship === 'freight');
+  el('flavCount').textContent = sample
+    ? (t.sticks + ' of ' + SAMPLE_STOKKIES + ' picked')
+    : '3 available';
+
+  /* steppers */
   FLAVOURS.forEach(f => {
-    el('out-' + f.id).textContent = qty[f.id] + ' kg';
+    const n = s[f.id];
+    el('out-' + f.id).textContent = sample
+      ? (n + (n === 1 ? ' stokkie' : ' stokkies'))
+      : (n + ' kg');
     const val = el('val-' + f.id);
-    val.textContent = money(qty[f.id] * CONFIG.pricePerKg);
-    val.classList.toggle('on', qty[f.id] > 0);
-    document.querySelector(`[data-step="-1"][data-id="${f.id}"]`).disabled = qty[f.id] === 0;
+    val.textContent = sample ? (n ? 'free' : '') : money(n * CONFIG.pricePerKg);
+    val.classList.toggle('on', n > 0);
+    document.querySelector(`[data-step="-1"][data-id="${f.id}"]`).disabled = !mode || n === 0;
+    document.querySelector(`[data-step="1"][data-id="${f.id}"]`).disabled =
+      !mode || (sample && t.sticks >= SAMPLE_STOKKIES);
   });
 
+  /* summary lines */
   const lines = el('lines');
-  if (t.kg === 0) {
+  const picked = FLAVOURS.filter(f => s[f.id]);
+  if (!mode) {
+    lines.innerHTML = '<div class="ln empty">Choose how you want to order first.</div>';
+  } else if (!picked.length) {
     lines.innerHTML = '<div class="ln empty">No droëwors selected.</div>';
+  } else if (sample) {
+    lines.innerHTML = picked.map(f =>
+      `<div class="ln"><span class="n">${f.name} · ${s[f.id]}</span><span class="v">free</span></div>`).join('')
+      + '<div class="ln"><span class="n">Freight</span><span class="v">free</span></div>';
   } else {
-    let h = FLAVOURS.filter(f => qty[f.id]).map(f =>
-      `<div class="ln"><span class="n">${f.name} · ${qty[f.id]} kg</span><span class="v">${money(qty[f.id] * CONFIG.pricePerKg)}</span></div>`).join('');
-    h += `<div class="ln"><span class="n">Freight</span><span class="v">${ship ? (t.freight ? money(t.freight) : 'free') : 'not set'}</span></div>`;
-    lines.innerHTML = h;
+    lines.innerHTML = picked.map(f =>
+      `<div class="ln"><span class="n">${f.name} · ${s[f.id]} kg</span><span class="v">${money(s[f.id] * CONFIG.pricePerKg)}</span></div>`).join('')
+      + `<div class="ln"><span class="n">Freight</span><span class="v">${ship ? (t.freight ? money(t.freight) : 'free') : 'not set'}</span></div>`;
   }
-  el('total').textContent = money(t.total);
+  el('total').textContent = sample ? 'Free' : money(t.total);
 
   el('localHint').classList.toggle('show',
-    ship === 'freight' && FREE_POSTCODES.includes(el('a4').value.trim()));
+    !sample && ship === 'freight' && FREE_POSTCODES.includes(el('a4').value.trim()));
+
+  el('ck1').textContent = sample
+    ? `${SAMPLE_STOKKIES} stokkies picked`
+    : 'At least 1 kg selected';
+  el('ck2').textContent = sample
+    ? 'Address and first timer confirmed'
+    : 'Delivery or pickup chosen';
 
   el('ck1').classList.toggle('done', v.qty);
   el('ck2').classList.toggle('done', v.ship);
   el('ck3').classList.toggle('done', v.who);
 
-  const allGood = v.qty && v.ship && v.who;
+  const allGood = !!mode && v.qty && v.ship && v.who;
   el('dot').className = 'dot ' + (allGood ? 'ok' : 'wait');
   el('dot').textContent = allGood ? '✓' : '!';
 
   if (allGood) {
-    el('stTitle').textContent = `${t.kg} kg ready to send`;
-    el('stDesc').textContent = `Copy your order across, then transfer ${money(t.total)}.`;
-  } else if (!v.qty) {
+    el('stTitle').textContent = sample
+      ? 'Taste pack ready to send'
+      : `${t.kg} kg ready to send`;
+    el('stDesc').textContent = sample
+      ? 'Nothing to pay. I will post these out with the next batch.'
+      : `Send your order, then transfer ${money(t.total)}.`;
+  } else if (!mode) {
     el('stTitle').textContent = 'Nothing selected yet';
-    el('stDesc').textContent = 'Add at least 1 kg to get started.';
+    el('stDesc').textContent = 'Buying by the kilo, or three free stokkies to try?';
+  } else if (!v.qty) {
+    el('stTitle').textContent = sample ? 'Pick your three stokkies' : 'Nothing selected yet';
+    el('stDesc').textContent = sample
+      ? 'One of each, two and one, or all three the same. Your call.'
+      : 'Add at least 1 kg to get started.';
   } else if (!v.ship) {
-    el('stTitle').textContent = 'Pick a delivery option';
-    el('stDesc').textContent = ship === 'freight' ? 'Fill in the full delivery address, including postcode.' : 'Kerang and Swan Hill have no freight charge.';
+    if (sample) {
+      el('stTitle').textContent = el('firstTimer').checked ? 'Where do I post it?' : 'One box left to tick';
+      el('stDesc').textContent = el('firstTimer').checked
+        ? 'Fill in the full address, including postcode.'
+        : 'Taste packs are only for people who have not bought before.';
+    } else {
+      el('stTitle').textContent = 'Pick a delivery option';
+      el('stDesc').textContent = ship === 'freight'
+        ? 'Fill in the full delivery address, including postcode.'
+        : 'Kerang and Swan Hill have no freight charge.';
+    }
   } else {
     el('stTitle').textContent = 'Almost there';
-    el('stDesc').textContent = 'Add your name and phone so I know whose order it is.';
+    el('stDesc').textContent = 'Add your name, email and phone so I can send your copy.';
   }
   el('send').disabled = !allGood;
 }
@@ -709,36 +841,46 @@ function payload() {
   return {
     name: el('name').value.trim(),
     phone: el('phone').value.trim(),
-    trad: qty.trad, mild: qty.mild, hot: qty.hot,
+    email: el('email').value.trim(),
+    orderType: isSample() ? 'Taste pack' : 'Paid order',
+    trad: kg.trad, mild: kg.mild, hot: kg.hot,
     totalKg: t.kg,
-    shipping: s ? s.t : '',
+    stTrad: st.trad, stMild: st.mild, stHot: st.hot,
+    firstTimer: el('firstTimer').checked,
+    shipping: isSample() ? 'Free freight anywhere in Australia' : (s ? s.t : ''),
     freight: t.freight,
     total: t.total,
-    address: ship === 'freight' ? addressText() : '',
+    address: (isSample() || ship === 'freight') ? addressText() : '',
     notes: el('notes').value.trim()
   };
 }
 
 function showDone() {
   const t = totals();
+  const sample = isSample();
   const aside = document.querySelector('aside');
-  aside.innerHTML = `
-    <div class="sum">
-      <header>Order received</header>
-      <div class="status">
-        <span class="dot ok" aria-hidden="true">✓</span>
-        <div>
-          <div class="st">${t.kg} kg locked in</div>
-          <div class="sd">Transfer ${money(t.total)} to finish it off. I will be in touch when the batch goes on the racks.</div>
-        </div>
-      </div>
+
+  const bankRows = sample ? '' : `
       <div class="lines">
         <div class="ln"><span class="n">Name</span><span class="v">Rob Sobey</span></div>
         <div class="ln"><span class="n">BSB</span><span class="v">484799</span></div>
         <div class="ln"><span class="n">Account</span><span class="v">006760643</span></div>
         <div class="ln"><span class="n">Reference</span><span class="v">your name</span></div>
-      </div>
-      <div class="tot"><span class="n">to pay</span><span class="v">${money(t.total)}</span></div>
+      </div>`;
+
+  aside.innerHTML = `
+    <div class="sum">
+      <header>${sample ? 'Taste pack booked' : 'Order received'}</header>
+      <div class="status">
+        <span class="dot ok" aria-hidden="true">✓</span>
+        <div>
+          <div class="st">${sample ? t.sticks + ' free stokkies on the way' : t.kg + ' kg locked in'}</div>
+          <div class="sd">${sample
+            ? 'Nothing to pay. A copy is on its way to your inbox. Let me know what you think of them.'
+            : 'Transfer ' + money(t.total) + ' to finish it off. A copy is on its way to your inbox, bank details included.'}</div>
+        </div>
+      </div>${bankRows}
+      <div class="tot"><span class="n">to pay</span><span class="v">${sample ? 'Nothing' : money(t.total)}</span></div>
       <div class="act">
         <button class="btn ghost" id="again">Place another order</button>
       </div>
