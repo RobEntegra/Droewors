@@ -168,13 +168,19 @@ aside{position:sticky;top:78px;display:grid;gap:16px}
 /* ---------- fields ---------- */
 label.f{display:block;font-size:13px;color:var(--muted);margin:0 0 6px}
 label.f i{color:var(--hot);font-style:normal}
-input[type=text],input[type=tel],textarea{
+input[type=text],input[type=tel],textarea,select{
   width:100%;padding:9px 11px;background:#0d1319;color:var(--text);
   border:1px solid var(--border2);border-radius:7px;
   font-family:var(--sans);font-size:14.5px;
 }
+select{appearance:none;background-image:none;cursor:pointer}
 input::placeholder,textarea::placeholder{color:#5b646e}
-input:focus,textarea:focus{border-color:var(--link);outline:none;box-shadow:0 0 0 3px rgba(90,162,240,.15)}
+input:focus,textarea:focus,select:focus{border-color:var(--link);outline:none;box-shadow:0 0 0 3px rgba(90,162,240,.15)}
+.hint{
+  display:none;margin-top:4px;padding:11px 13px;border-radius:7px;font-size:13px;
+  border:1px solid #2c5c39;background:rgba(53,153,80,.09);color:#7fd396;
+}
+.hint.show{display:block}
 textarea{min-height:76px;resize:vertical}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
 .field{margin-bottom:16px}
@@ -318,7 +324,6 @@ footer{
       <span class="topic">mild chilli</span>
       <span class="topic">hot chilli</span>
       <span class="topic">air dried</span>
-      <span class="topic">no rush</span>
     </div>
     <dl class="facts">
       <div class="fact"><dt>price</dt><dd>$68 / kg</dd></div>
@@ -363,6 +368,7 @@ footer{
         <div class="ing"><span class="n">vinegar</span><span class="p">natural preservative</span></div>
         <div class="ing"><span class="n">Worcestershire sauce</span><span class="p">natural preservative</span></div>
         <hr class="rule">
+        <p class="small"><strong style="color:var(--cream);font-weight:600">Perfect for Keto, Carnivore or Ketovore diets.</strong></p>
         <p class="small">That is the whole list. No artificial preservatives and nothing else added. The chilli versions are the same base with chilli mixed through, mild or hot.</p>
       </div>
     </section>
@@ -371,8 +377,30 @@ footer{
       <header><b>Getting it to you</b></header>
       <div class="opts" id="ship"></div>
       <div class="addr" id="addrWrap">
-        <label class="f" for="addr">Delivery address <i>*</i></label>
-        <textarea id="addr" placeholder="Street, suburb, state, postcode"></textarea>
+        <p class="tiny" style="margin:0 0 14px">Full address please, so the courier can actually find you.</p>
+        <div class="field">
+          <label class="f" for="a1">Street address <i>*</i></label>
+          <input type="text" id="a1" autocomplete="address-line1" placeholder="15 Rabaul Place">
+        </div>
+        <div class="field">
+          <label class="f" for="a2">Suburb or town <i>*</i></label>
+          <input type="text" id="a2" autocomplete="address-level2" placeholder="Ashmont">
+        </div>
+        <div class="grid2">
+          <div class="field">
+            <label class="f" for="a3">State <i>*</i></label>
+            <select id="a3" autocomplete="address-level1">
+              <option value="">Choose</option>
+              <option>VIC</option><option>NSW</option><option>QLD</option><option>SA</option>
+              <option>WA</option><option>TAS</option><option>NT</option><option>ACT</option>
+            </select>
+          </div>
+          <div class="field">
+            <label class="f" for="a4">Postcode <i>*</i></label>
+            <input type="text" id="a4" inputmode="numeric" maxlength="4" autocomplete="postal-code" placeholder="2650">
+          </div>
+        </div>
+        <div class="hint" id="localHint">That postcode is one of my free areas. Pick the Kerang or Swan Hill option above and save yourself the 15 dollars.</div>
       </div>
     </section>
 
@@ -536,13 +564,35 @@ el('ship').addEventListener('change', e => {
   render();
 });
 
-['name','phone','addr','notes'].forEach(id => el(id).addEventListener('input', render));
+const FREE_POSTCODES = ['3579','3585'];
+const ADDR_FIELDS = ['a1','a2','a3','a4'];
+
+['name','phone','notes'].concat(ADDR_FIELDS).forEach(id => {
+  el(id).addEventListener('input', render);
+  el(id).addEventListener('change', render);
+});
+
+function addressText() {
+  const street = el('a1').value.trim();
+  const suburb = el('a2').value.trim();
+  const state  = el('a3').value.trim();
+  const post   = el('a4').value.trim();
+  if (!street && !suburb) return '';
+  return `${street}, ${suburb} ${state} ${post}`.replace(/\s+/g, ' ').trim();
+}
+
+function addressComplete() {
+  return el('a1').value.trim().length > 3
+      && el('a2').value.trim().length > 1
+      && el('a3').value !== ''
+      && /^\d{4}$/.test(el('a4').value.trim());
+}
 
 el('reset').addEventListener('click', () => {
   FLAVOURS.forEach(f => qty[f.id] = 0);
   ship = null;
   document.querySelectorAll('input[name=ship]').forEach(r => r.checked = false);
-  ['name','phone','addr','notes'].forEach(id => el(id).value = '');
+  ['name','phone','notes'].concat(ADDR_FIELDS).forEach(id => el(id).value = '');
   el('addrWrap').classList.remove('show');
   render();
 });
@@ -583,7 +633,7 @@ function valid() {
   const { kg } = totals();
   return {
     qty: kg >= 1,
-    ship: !!ship && (ship !== 'freight' || el('addr').value.trim().length > 5),
+    ship: !!ship && (ship !== 'freight' || addressComplete()),
     who: el('name').value.trim().length > 1 && el('phone').value.trim().length >= 6
   };
 }
@@ -597,7 +647,7 @@ function orderText() {
   lines.push(`TOTAL TO PAY: ${money(t.total)}`, '');
   const s = SHIPPING.find(x => x.id === ship);
   lines.push(`Delivery: ${s ? s.t : ''}`);
-  if (ship === 'freight') lines.push(`Address: ${el('addr').value.trim()}`);
+  if (ship === 'freight') lines.push(`Address: ${addressText()}`);
   lines.push('', `Name: ${el('name').value.trim()}`, `Phone: ${el('phone').value.trim()}`);
   if (el('notes').value.trim()) lines.push(`Notes: ${el('notes').value.trim()}`);
   return lines.join('\n');
@@ -626,6 +676,9 @@ function render() {
   }
   el('total').textContent = money(t.total);
 
+  el('localHint').classList.toggle('show',
+    ship === 'freight' && FREE_POSTCODES.includes(el('a4').value.trim()));
+
   el('ck1').classList.toggle('done', v.qty);
   el('ck2').classList.toggle('done', v.ship);
   el('ck3').classList.toggle('done', v.who);
@@ -642,7 +695,7 @@ function render() {
     el('stDesc').textContent = 'Add at least 1 kg to get started.';
   } else if (!v.ship) {
     el('stTitle').textContent = 'Pick a delivery option';
-    el('stDesc').textContent = ship === 'freight' ? 'Add the address you want it sent to.' : 'Kerang and Swan Hill have no freight charge.';
+    el('stDesc').textContent = ship === 'freight' ? 'Fill in the full delivery address, including postcode.' : 'Kerang and Swan Hill have no freight charge.';
   } else {
     el('stTitle').textContent = 'Almost there';
     el('stDesc').textContent = 'Add your name and phone so I know whose order it is.';
@@ -661,7 +714,7 @@ function payload() {
     shipping: s ? s.t : '',
     freight: t.freight,
     total: t.total,
-    address: ship === 'freight' ? el('addr').value.trim() : '',
+    address: ship === 'freight' ? addressText() : '',
     notes: el('notes').value.trim()
   };
 }
