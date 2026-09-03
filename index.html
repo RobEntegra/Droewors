@@ -910,20 +910,37 @@ el('send').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'Sending your order';
 
+  // A real form POST into a hidden iframe. Browsers do not apply CORS to
+  // form submissions, so this reaches Apps Script where fetch could not.
   try {
-    // Apps Script answers /exec with a cross-domain redirect that carries no
-    // CORS headers, so a readable response is impossible. Send it opaque:
-    // the request lands and doPost runs, we just cannot read the reply.
-    await fetch(CONFIG.endpoint, {
-      method: 'POST',
-      mode: 'no-cors',
-      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-      body: JSON.stringify(payload())
-    });
+    let frame = document.getElementById('sink');
+    if (!frame) {
+      frame = document.createElement('iframe');
+      frame.id = 'sink';
+      frame.name = 'sink';
+      frame.style.display = 'none';
+      document.body.appendChild(frame);
+    }
+
+    const f = document.createElement('form');
+    f.method = 'POST';
+    f.action = CONFIG.endpoint;
+    f.target = 'sink';
+    f.style.display = 'none';
+
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'payload';
+    input.value = JSON.stringify(payload());
+    f.appendChild(input);
+
+    document.body.appendChild(f);
+    f.submit();
+    setTimeout(() => f.remove(), 2000);
+
     showDone();
   } catch (err) {
     sending = false;
-    CONFIG.endpoint = '';
     btn.disabled = false;
     btn.textContent = 'Copy order and send to Rob';
     el('dot').className = 'dot wait';
