@@ -10,9 +10,9 @@
 <style>
 :root{
   --canvas:#0b0f14;
-  --surface:rgba(20,26,33,.84);
-  --surface2:rgba(27,35,44,.88);
-  --surface3:rgba(34,44,55,.90);
+  --surface:rgba(18,24,31,.90);
+  --surface2:rgba(25,33,42,.92);
+  --surface3:rgba(34,44,55,.94);
   --border:#2c353f;
   --border2:#3d4854;
   --text:#e7edf3;
@@ -37,7 +37,7 @@ body::before{
 }
 body::after{
   content:"";position:fixed;inset:0;z-index:-1;
-  background:linear-gradient(160deg,rgba(9,12,16,.90),rgba(9,12,16,.955) 55%,rgba(9,12,16,.985));
+  background:linear-gradient(160deg,rgba(9,12,16,.58),rgba(9,12,16,.70) 55%,rgba(9,12,16,.80));
 }
 body{
   margin:0;background:var(--canvas);color:var(--text);
@@ -52,7 +52,7 @@ img{display:block;max-width:100%}
 /* ---------- top bar ---------- */
 .topbar{
   display:flex;align-items:center;gap:10px;
-  padding:12px 20px;background:rgba(14,20,26,.86);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  padding:12px 20px;background:rgba(12,17,23,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
   border-bottom:1px solid var(--border);
   position:sticky;top:0;z-index:40;
 }
